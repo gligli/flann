@@ -40,6 +40,7 @@ typedef unsigned __int64 uint64_t;
 #else
 #include <stdint.h>
 #endif
+#include "pmmintrin.h"
 
 #include "flann/defines.h"
 
@@ -149,31 +150,33 @@ struct L2
     template <typename Iterator1, typename Iterator2>
     ResultType operator()(Iterator1 a, Iterator2 b, size_t size, ResultType worst_dist = -1) const
     {
-        ResultType result = ResultType();
-        ResultType diff0, diff1, diff2, diff3;
-        Iterator1 last = a + size;
-        Iterator1 lastgroup = last - 3;
+        return euclidean_intrinsic_float(size, (const float *) a, (const float*)b);
+        
+        //ResultType result = ResultType();
+        //ResultType diff0, diff1, diff2, diff3;
+        //Iterator1 last = a + size;
+        //Iterator1 lastgroup = last - 3;
 
-        /* Process 4 items with each loop for efficiency. */
-        while (a < lastgroup) {
-            diff0 = (ResultType)(a[0] - b[0]);
-            diff1 = (ResultType)(a[1] - b[1]);
-            diff2 = (ResultType)(a[2] - b[2]);
-            diff3 = (ResultType)(a[3] - b[3]);
-            result += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
-            a += 4;
-            b += 4;
+        ///* Process 4 items with each loop for efficiency. */
+        //while (a < lastgroup) {
+        //    diff0 = (ResultType)(a[0] - b[0]);
+        //    diff1 = (ResultType)(a[1] - b[1]);
+        //    diff2 = (ResultType)(a[2] - b[2]);
+        //    diff3 = (ResultType)(a[3] - b[3]);
+        //    result += diff0 * diff0 + diff1 * diff1 + diff2 * diff2 + diff3 * diff3;
+        //    a += 4;
+        //    b += 4;
 
-            if ((worst_dist>0)&&(result>worst_dist)) {
-                return result;
-            }
-        }
-        /* Process last 0-3 pixels.  Not needed for standard vector lengths. */
-        while (a < last) {
-            diff0 = (ResultType)(*a++ - *b++);
-            result += diff0 * diff0;
-        }
-        return result;
+        //    //if ((worst_dist>0)&&(result>worst_dist)) {
+        //    //    return result;
+        //    //}
+        //}
+        ///* Process last 0-3 pixels.  Not needed for standard vector lengths. */
+        //while (a < last) {
+        //    diff0 = (ResultType)(*a++ - *b++);
+        //    result += diff0 * diff0;
+        //}
+        //return result;
     }
 
     /**
@@ -186,6 +189,52 @@ struct L2
     inline ResultType accum_dist(const U& a, const V& b, int) const
     {
         return (a-b)*(a-b);
+    }
+
+    __declspec(noinline) static const float euclidean_baseline_float(const int n, const float* x, const float* y) {
+      float result = 0.f;
+      for (int i = 0; i < n; ++i) {
+        const float num = x[i] - y[i];
+        result += num * num;
+      }
+      return result;
+    }
+
+    static const float euclidean_intrinsic_float(int n, const float* x, const float* y) {
+      __m128 euclidean0 = _mm_setzero_ps();
+      __m128 euclidean1 = _mm_setzero_ps();
+
+      for (; n > 7; n -= 8) {
+        const __m128 a0 = _mm_loadu_ps(x);
+        x += 4;
+        const __m128 a1 = _mm_loadu_ps(x);
+        x += 4;
+        const __m128 b0 = _mm_loadu_ps(y);
+        y += 4;
+        const __m128 b1 = _mm_loadu_ps(y);
+        y += 4;
+
+        const __m128 a0_minus_b0 = _mm_sub_ps(a0, b0);
+        const __m128 a1_minus_b1 = _mm_sub_ps(a1, b1);
+
+        const __m128 a0_minus_b0_sq = _mm_mul_ps(a0_minus_b0, a0_minus_b0);
+        const __m128 a1_minus_b1_sq = _mm_mul_ps(a1_minus_b1, a1_minus_b1);
+
+        euclidean0 = _mm_add_ps(euclidean0, a0_minus_b0_sq);
+        euclidean1 = _mm_add_ps(euclidean1, a1_minus_b1_sq);
+      }
+
+      const __m128 euclidean = _mm_add_ps(euclidean0, euclidean1);
+
+      const __m128 sumt = _mm_hadd_ps(euclidean, euclidean);
+      const __m128 sum = _mm_hadd_ps(sumt, sumt);
+
+      float result = sum.m128_f32[0];
+
+      if (n)
+        result += euclidean_baseline_float(n, x, y);	// remaining 1-7 entries
+
+      return result;
     }
 };
 
