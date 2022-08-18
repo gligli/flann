@@ -29,7 +29,7 @@
 #define FLANN_FIRST_MATCH
 
 #include "flann.h"
-
+#include "oneapi/tbb/tbbmalloc_proxy.h"
 
 struct FLANNParameters DEFAULT_FLANN_PARAMETERS = {
     FLANN_INDEX_KDTREE,
@@ -181,13 +181,13 @@ void flann_log_verbosity(int level)
     flann::log_verbosity(level);
 }
 
-flann_distance_t flann_distance_type = FLANN_DIST_EUCLIDEAN;
-int flann_distance_order = 3;
+const flann_distance_t flann_distance_type = FLANN_DIST_EUCLIDEAN;
+const int flann_distance_order = 3;
 
 void flann_set_distance_type(flann_distance_t distance_type, int order)
 {
-    flann_distance_type = distance_type;
-    flann_distance_order = order;
+    //flann_distance_type = distance_type;
+    //flann_distance_order = order;
 }
 
 
