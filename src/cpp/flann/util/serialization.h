@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <lz4.h>
 #include <lz4hc.h>
+#include "../oneapi/tbb/scalable_allocator.h"
 
 
 namespace flann
@@ -395,8 +396,8 @@ class SaveArchive : public OutputArchive<SaveArchive>
     {
         // Alloc the space for both buffer blocks (each compressed block
         // references the previous)
-        buffer_ = buffer_blocks_ = (char *)malloc(BLOCK_BYTES*2);
-        compressed_buffer_ = (char *)malloc(LZ4_COMPRESSBOUND(BLOCK_BYTES) + sizeof(size_t));
+        buffer_ = buffer_blocks_ = (char *)scalable_malloc(BLOCK_BYTES*2);
+        compressed_buffer_ = (char *)scalable_malloc(LZ4_COMPRESSBOUND(BLOCK_BYTES) + sizeof(size_t));
         if (buffer_ == NULL || compressed_buffer_ == NULL) {
             throw FLANNException("Error allocating compression buffer");
         }
@@ -467,10 +468,10 @@ class SaveArchive : public OutputArchive<SaveArchive>
     void endBlock()
     {
         // Cleanup memory
-        free(buffer_blocks_);
+        scalable_free(buffer_blocks_);
         buffer_blocks_ = NULL;
         buffer_ = NULL;
-        free(compressed_buffer_);
+        scalable_free(compressed_buffer_);
         compressed_buffer_ = NULL;
         
         // Write a '0' size for next block
@@ -496,7 +497,7 @@ public:
         flushBlock();
         endBlock();
         if (buffer_) {
-            free(buffer_);
+            scalable_free(buffer_);
             buffer_ = NULL;
         }
     	if (own_stream_) {
@@ -577,12 +578,12 @@ class LoadArchive : public InputArchive<LoadArchive>
         size_t headSz = sizeof(IndexHeaderStruct);
 
         // Read the (compressed) file to a buffer
-        char *compBuffer = (char *)malloc(fileSize);
+        char *compBuffer = (char *)scalable_malloc(fileSize);
         if (compBuffer == NULL) {
             throw FLANNException("Error allocating file buffer space");
         }
         if (fread(compBuffer, fileSize, 1, stream) != 1) {
-            free(compBuffer);
+            scalable_free(compBuffer);
             throw FLANNException("Invalid index file, cannot read from disk (compressed)");
         }
 
@@ -595,14 +596,14 @@ class LoadArchive : public InputArchive<LoadArchive>
         
         // Check for compression type
         if (head->compression != 1) {
-            free(compBuffer);
+            scalable_free(compBuffer);
             throw FLANNException("Compression type not supported");
         }
         
         // Allocate a decompressed buffer
-        ptr_ = buffer_ = (char *)malloc(uncompressedSz+headSz);
+        ptr_ = buffer_ = (char *)scalable_malloc(uncompressedSz+headSz);
         if (buffer_ == NULL) {
-            free(compBuffer);
+            scalable_free(compBuffer);
             throw FLANNException("Error (re)allocating decompression buffer");
         }
         
@@ -614,13 +615,13 @@ class LoadArchive : public InputArchive<LoadArchive>
         
         // Check if the decompression was the expected size.
         if (usedSz != uncompressedSz) {
-            free(compBuffer);
+            scalable_free(compBuffer);
             throw FLANNException("Unexpected decompression size");
         }
         
         // Copy header data
         memcpy(buffer_, compBuffer, headSz);
-        free(compBuffer);
+        scalable_free(compBuffer);
         
         // Put the file pointer at the end of the data we've read
         if (compressedSz+headSz+pos != fileSize)
@@ -637,28 +638,28 @@ class LoadArchive : public InputArchive<LoadArchive>
         size_t headSz = sizeof(IndexHeaderStruct);
         
         // Read the file header to a buffer
-        IndexHeaderStruct *head = (IndexHeaderStruct *)malloc(headSz);
+        IndexHeaderStruct *head = (IndexHeaderStruct *)scalable_malloc(headSz);
         if (head == NULL) {
             throw FLANNException("Error allocating header buffer space");
         }
         if (fread(head, headSz, 1, stream) != 1) {
-            free(head);
+            scalable_free(head);
             throw FLANNException("Invalid index file, cannot read from disk (header)");
         }
         
         // Backward compatability
         if (head->signature[13] == '1' && head->signature[15] == '0') {
-            free(head);
+            scalable_free(head);
             fseek(stream, pos, SEEK_SET);
             return decompressAndLoadV10(stream);
         }
         
         // Alloc the space for both buffer blocks (each block
         // references the previous)
-        buffer_ = buffer_blocks_ = (char *)malloc(BLOCK_BYTES*2);
-        compressed_buffer_ = (char *)malloc(LZ4_COMPRESSBOUND(BLOCK_BYTES));
+        buffer_ = buffer_blocks_ = (char *)scalable_malloc(BLOCK_BYTES*2);
+        compressed_buffer_ = (char *)scalable_malloc(LZ4_COMPRESSBOUND(BLOCK_BYTES));
         if (buffer_ == NULL || compressed_buffer_ == NULL) {
-            free(head);
+            scalable_free(head);
             throw FLANNException("Error allocating compression buffer");
         }
         
@@ -671,7 +672,7 @@ class LoadArchive : public InputArchive<LoadArchive>
         loadBlock(buffer_+headSz, head->first_block_size, stream);
         block_sz_ += headSz;
         ptr_ = buffer_;
-        free(head);
+        scalable_free(head);
     }
 
     void loadBlock(char* buffer_, size_t compSz, FILE* stream)
@@ -732,13 +733,13 @@ class LoadArchive : public InputArchive<LoadArchive>
             }
         }
         
-        // Free resources
+        // scalable_free resources
         if (buffer_blocks_ != NULL) {
-            free(buffer_blocks_);
+            scalable_free(buffer_blocks_);
             buffer_blocks_ = NULL;
         }
         if (compressed_buffer_ != NULL) {
-            free(compressed_buffer_);
+            scalable_free(compressed_buffer_);
             compressed_buffer_ = NULL;
         }
         ptr_ = NULL;

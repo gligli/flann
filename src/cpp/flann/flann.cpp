@@ -29,7 +29,6 @@
 #define FLANN_FIRST_MATCH
 
 #include "flann.h"
-#include "oneapi/tbb/tbbmalloc_proxy.h"
 
 struct FLANNParameters DEFAULT_FLANN_PARAMETERS = {
     FLANN_INDEX_KDTREE,
