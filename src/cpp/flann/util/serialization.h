@@ -10,6 +10,23 @@
 #include <lz4hc.h>
 #include "../oneapi/tbb/scalable_allocator.h"
 
+extern "C"
+{
+    void* LZ4_malloc(size_t s)
+    {
+        return scalable_malloc(s);
+    }
+
+    void* LZ4_calloc(size_t n, size_t s)
+    {
+        return scalable_calloc(n, s);
+    }
+
+    void  LZ4_free(void* p)
+    {
+        scalable_free(p);
+    }
+}
 
 namespace flann
 {
