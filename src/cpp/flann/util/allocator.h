@@ -33,8 +33,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "../oneapi/tbb/tbbmalloc_proxy.h"
-#include "../oneapi/tbb/scalable_allocator.h"
 
 namespace flann
 {
@@ -49,7 +47,7 @@ namespace flann
 template <typename T>
 T* allocate(size_t count = 1)
 {
-    T* mem = (T*) scalable_malloc(sizeof(T)*count);
+    T* mem = (T*) ::malloc(sizeof(T)*count);
     return mem;
 }
 
@@ -117,7 +115,7 @@ public:
         void* prev;
         while (base != NULL) {
             prev = *((void**) base); /* Get pointer to prev block. */
-            scalable_free(base);
+            ::free(base);
             base = prev;
         }
         base = NULL;
@@ -152,7 +150,7 @@ public:
                         size + sizeof(void*) + (WORDSIZE-1) : BLOCKSIZE;
 
             // use the standard C malloc to allocate memory
-            void* m = scalable_malloc(blocksize);
+            void* m = ::malloc(blocksize);
             if (!m) {
                 fprintf(stderr,"Failed to allocate memory.\n");
                 return NULL;
