@@ -26,8 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *************************************************************************/
 
-#include "oneapi/tbb/tbbmalloc_proxy.h"
-
 #define FLANN_FIRST_MATCH
 
 #include "flann.h"
